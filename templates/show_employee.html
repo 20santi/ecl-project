@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Search Employee</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #fffacd; /* Light yellow */
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding-top: 40px;
+    }
+
+    .container {
+      background-color: #ffffff;
+      padding: 40px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 800px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+      text-align: center;
+      color: #003366;
+      margin-top: 0;
+    }
+
+    .search-box {
+      margin-bottom: 30px;
+    }
+
+    label {
+      font-weight: bold;
+      color: #003366;
+    }
+
+    input[type="text"] {
+      padding: 10px;
+      width: 60%;
+      border-radius: 5px;
+      border: 2px solid #003366;
+      background-color: #e0f0ff;
+      font-size: 16px;
+    }
+
+    input[type="submit"],
+    button {
+      background-color: yellow;
+      border: 2px solid #FFD700;
+      color: black;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-left: 0px;
+      transition: background-color 0.3s;
+    }
+
+    input[type="submit"]:hover,
+    button:hover {
+      background-color: #E6BE00;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    th, td {
+      border: 1px solid black;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f2f2f2;
+    }
+
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      color: #4b0082;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+    label {
+  margin-right: 10px;
+} 
+
+    input[type="text"] {
+      width: 70%;
+      margin-right: 10px;
+    }
+
+    .search-box form {
+      display: flex-column;
+      justify-content: center;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Search Employee Details</h2>
+
+    <div class="search-box">
+      <form action="/get_employee" method="POST">
+        <label for="name">Enter Name:</label><br>
+        <input type="text" id="name" name="name" required>
+        <input type="submit" value="Search">
+      </form>
+    </div>
+
+    {% if searched %}
+      {% if employee %}
+        <h3>Result for: {{ name }}</h3>
+        <table>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Employee ID</th>
+            <th>Phone</th>
+            <th>Address</th>
+          </tr>
+          <tr>
+            <td>{{ employee[0] }}</td>
+            <td>{{ employee[1] }}</td>
+            <td>{{ employee[2] }}</td>
+            <td>{{ employee[3] }}</td>
+            <td>{{ employee[4] }}</td>
+            <td>{{ employee[5] }}</td>
+          </tr>
+        </table>
+
+        <br>
+        <button onclick="downloadExcel('{{ name }}')">Download Excel</button>
+      {% else %}
+        <p><strong>No employee found with the name "{{ name }}".</strong></p>
+      {% endif %}
+    {% endif %}
+
+    <br>
+    <a href="/">Back to Employee Form</a>
+  </div>
+
+  <script>
+    function downloadExcel(name) {
+      if (!name || name === "None") {
+        alert("No employee selected to export.");
+        return;
+      }
+
+      fetch(`/download_excel?name=${encodeURIComponent(name)}`)
+        .then(response => {
+          if (!response.ok) throw new Error("Failed to download file");
+          return response.blob();
+        })
+        .then(blob => {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+
+          const now = new Date();
+          const timestamp = now.toISOString().slice(0, 19).replace(/[:T]/g, "-");
+          a.download = `${timestamp}.xlsx`;
+
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        })
+        .catch(error => console.error('Error:', error));
+    }
+  </script>
+</body>
+</html>
