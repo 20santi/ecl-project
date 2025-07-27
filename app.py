@@ -32,21 +32,37 @@ def index():
 @app.route('/get_employee', methods=['GET', 'POST'])
 def get_employee_detail():
     if request.method == 'POST':
-        raw_names = request.form['name']
-        name_list = [name.strip() for name in raw_names.split(',') if name.strip()]
-        
-        placeholders = ','.join(['?'] * len(name_list))
-        query = f'SELECT * FROM employees WHERE name IN ({placeholders})'
+        raw_input = request.form['name']
+        search_terms = [term.strip() for term in raw_input.split(',') if term.strip()]
+
+        if not search_terms:
+            return render_template('show_employee.html', employees=[], names=raw_input, searched=True)
+
         conn = sqlite3.connect('employee.db')
         cursor = conn.cursor()
-        cursor.execute(query, name_list)
-        employees = cursor.fetchall()
-        conn.close()
-        return render_template('show_employee.html', employees=employees, names=raw_names, searched=True)
 
-    
-    # For GET request: just render search form without result
+        # Use a set to avoid duplicate rows
+        result_set = set()
+
+        for term in search_terms:
+            like_term = f"%{term}%"
+            cursor.execute('''
+                SELECT * FROM employees
+                WHERE name LIKE ? OR email LIKE ? OR employee_id LIKE ?
+                      OR phone LIKE ? OR address LIKE ?
+            ''', (like_term, like_term, like_term, like_term, like_term))
+            
+            for row in cursor.fetchall():
+                result_set.add(row)
+
+        conn.close()
+
+        # Convert set back to list
+        employees = list(result_set)
+        return render_template('show_employee.html', employees=employees, names=raw_input, searched=True)
+
     return render_template('show_employee.html', employees=None, names=None, searched=False)
+
 
 @app.route('/submit', methods=['POST'])
 def submit():
