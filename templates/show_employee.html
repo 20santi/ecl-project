@@ -127,29 +127,30 @@
     </div>
 
     {% if searched %}
-      {% if employee %}
-        <h3>Result for: {{ name }}</h3>
-        <table>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Employee ID</th>
-            <th>Phone</th>
-            <th>Address</th>
-          </tr>
-          <tr>
-            <td>{{ employee[0] }}</td>
-            <td>{{ employee[1] }}</td>
-            <td>{{ employee[2] }}</td>
-            <td>{{ employee[3] }}</td>
-            <td>{{ employee[4] }}</td>
-            <td>{{ employee[5] }}</td>
-          </tr>
-        </table>
-
+  {% if employees %}
+    <h3>Results for: {{ names }}</h3>
+    <table>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Employee ID</th>
+        <th>Phone</th>
+        <th>Address</th>
+      </tr>
+      {% for employee in employees %}
+      <tr>
+        <td>{{ employee[0] }}</td>
+        <td>{{ employee[1] }}</td>
+        <td>{{ employee[2] }}</td>
+        <td>{{ employee[3] }}</td>
+        <td>{{ employee[4] }}</td>
+        <td>{{ employee[5] }}</td>
+      </tr>
+      {% endfor %}
+    </table>
         <br>
-        <button onclick="downloadExcel('{{ name }}')">Download Excel</button>
+        <button onclick="downloadExcel('{{ names }}')">Download Excel</button>
       {% else %}
         <p><strong>No employee found with the name "{{ name }}".</strong></p>
       {% endif %}

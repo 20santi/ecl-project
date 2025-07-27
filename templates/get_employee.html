@@ -1,15 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Get Employee Details</title>
-</head>
-<body>
-  <h2>Search Employee Details</h2>
-  <form action="/get_employee" method="POST">
-    <label for="name">Enter Name:</label><br>
-    <input type="text" id="name" name="name" required><br><br>
-    <input type="submit" value="Search">
-  </form>
-</body>
-</html>
+@app.route('/get_employee', methods=['GET', 'POST'])
+def get_employee_detail():
+    if request.method == 'POST':
+        raw_names = request.form['name']
+        name_list = [name.strip() for name in raw_names.split(',') if name.strip()]
+        
+        placeholders = ','.join(['?'] * len(name_list))
+
+        conn = sqlite3.connect('employee.db')
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM employees WHERE name IN ({placeholders})", name_list)
+        employees = cursor.fetchall()
+        conn.close()
+
+        return render_template('show_employee.html', employees=employees, names=raw_names, searched=True)
+    
+    return render_template('show_employee.html', employees=None, names=None, searched=False)
+    

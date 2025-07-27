@@ -32,16 +32,21 @@ def index():
 @app.route('/get_employee', methods=['GET', 'POST'])
 def get_employee_detail():
     if request.method == 'POST':
-        name = request.form['name']
+        raw_names = request.form['name']
+        name_list = [name.strip() for name in raw_names.split(',') if name.strip()]
+        
+        placeholders = ','.join(['?'] * len(name_list))
+        query = f'SELECT * FROM employees WHERE name IN ({placeholders})'
         conn = sqlite3.connect('employee.db')
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM employees WHERE name = ?', (name,))
-        employee = cursor.fetchone()
+        cursor.execute(query, name_list)
+        employees = cursor.fetchall()
         conn.close()
-        return render_template('show_employee.html', employee=employee, name=name, searched=True)
+        return render_template('show_employee.html', employees=employees, names=raw_names, searched=True)
+
     
     # For GET request: just render search form without result
-    return render_template('show_employee.html', employee=None, name=None, searched=False)
+    return render_template('show_employee.html', employees=None, names=None, searched=False)
 
 @app.route('/submit', methods=['POST'])
 def submit():
@@ -63,23 +68,30 @@ def submit():
     return '<div><a href="/">Data submitted successfully. Go back!</a></div>'
 
 @app.route('/download_excel')
+@app.route('/download_excel')
 def download_excel():
-    name = request.args.get('name')  # Get employee name from query params
-
-    if not name:
+    raw_names = request.args.get('name')  # Might be "Alice, Bob"
+    if not raw_names:
         return "No employee name provided.", 400
+
+    name_list = [name.strip() for name in raw_names.split(',') if name.strip()]
+    if not name_list:
+        return "No valid employee names provided.", 400
+
+    placeholders = ','.join(['?'] * len(name_list))
+    query = f"SELECT * FROM employees WHERE name IN ({placeholders})"
 
     conn = sqlite3.connect('employee.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM employees WHERE name = ?", (name,))
-    row = cursor.fetchone()
+    cursor.execute(query, name_list)
+    rows = cursor.fetchall()
     conn.close()
 
-    if not row:   
-        return "Employee not found.", 404
+    if not rows:
+        return "No matching employees found.", 404
 
     columns = ['ID', 'Name', 'Email', 'Employee ID', 'Phone', 'Address']
-    df = pd.DataFrame([row], columns=columns)  # Wrap in list to create one-row DataFrame
+    df = pd.DataFrame(rows, columns=columns)
 
     output = BytesIO()
     df.to_excel(output, index=False, engine='openpyxl')
