@@ -68,29 +68,34 @@ def submit():
     return '<div><a href="/">Data submitted successfully. Go back!</a></div>'
 
 @app.route('/download_excel')
-@app.route('/download_excel')
 def download_excel():
-    raw_names = request.args.get('name')  # Might be "Alice, Bob"
-    if not raw_names:
-        return "No employee name provided.", 400
-
-    name_list = [name.strip() for name in raw_names.split(',') if name.strip()]
-    if not name_list:
-        return "No valid employee names provided.", 400
-
-    placeholders = ','.join(['?'] * len(name_list))
-    query = f"SELECT * FROM employees WHERE name IN ({placeholders})"
+    raw_names = request.args.get('name')
 
     conn = sqlite3.connect('employee.db')
     cursor = conn.cursor()
-    cursor.execute(query, name_list)
-    rows = cursor.fetchall()
+
+    if raw_names == "All Employees":
+        cursor.execute("SELECT * FROM employees")
+        rows = cursor.fetchall()
+    else:
+        if not raw_names:
+            return "No employee name provided.", 400
+
+        name_list = [name.strip() for name in raw_names.split(',') if name.strip()]
+        if not name_list:
+            return "No valid employee names provided.", 400
+
+        placeholders = ','.join(['?'] * len(name_list))
+        query = f"SELECT * FROM employees WHERE name IN ({placeholders})"
+        cursor.execute(query, name_list)
+        rows = cursor.fetchall()
+
     conn.close()
 
     if not rows:
         return "No matching employees found.", 404
 
-    columns = ['ID', 'Name', 'Email', 'Employee ID', 'Phone', 'Address']
+    columns = ['ID', 'Name', 'Email', 'Employee ID', 'Phone', 'Leave Reason']
     df = pd.DataFrame(rows, columns=columns)
 
     output = BytesIO()
@@ -106,6 +111,17 @@ def download_excel():
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
+@app.route('/all_employees', methods=['GET'])
+def all_employees():
+    conn = sqlite3.connect('employee.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM employees")
+    employees = cursor.fetchall()
+    conn.close()
+    return render_template('show_employee.html', employees=employees, names='All Employees', searched=True)
+
+
+init_db()  # Always initialize DB
+
 if __name__ == '__main__':
-    init_db()
     app.run(debug=True)
