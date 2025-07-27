@@ -19,7 +19,7 @@ def init_db():
             email TEXT NOT NULL,
             employee_id TEXT NOT NULL,
             phone TEXT NOT NULL,
-            address TEXT NOT NULL
+            address TEXT
         )
     ''')
     conn.commit()
