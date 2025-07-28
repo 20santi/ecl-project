@@ -4,9 +4,11 @@ import sqlite3
 from flask import send_file
 import pandas as pd # type: ignore
 from datetime import datetime
+from flask import session # type: ignore
 
 
 app = Flask(__name__)
+app.secret_key = 'my-secret-key-12345'  # type: ignore # Required for session usage
 
 # Create the database and table if not exists
 def init_db():
@@ -41,9 +43,7 @@ def get_employee_detail():
         conn = sqlite3.connect('employee.db')
         cursor = conn.cursor()
 
-        # Use a set to avoid duplicate rows
         result_set = set()
-
         for term in search_terms:
             like_term = f"%{term}%"
             cursor.execute('''
@@ -56,12 +56,15 @@ def get_employee_detail():
                 result_set.add(row)
 
         conn.close()
-
-        # Convert set back to list
         employees = list(result_set)
+
+        # Save result in session
+        session['export_data'] = employees
+
         return render_template('show_employee.html', employees=employees, names=raw_input, searched=True)
 
     return render_template('show_employee.html', employees=None, names=None, searched=False)
+
 
 
 @app.route('/submit', methods=['POST'])
@@ -85,28 +88,10 @@ def submit():
 
 @app.route('/download_excel')
 def download_excel():
-    raw_names = request.args.get('name')
+    if 'export_data' not in session:
+        return "No search result to export.", 400
 
-    conn = sqlite3.connect('employee.db')
-    cursor = conn.cursor()
-
-    if raw_names == "All Employees":
-        cursor.execute("SELECT * FROM employees")
-        rows = cursor.fetchall()
-    else:
-        if not raw_names:
-            return "No employee name provided.", 400
-
-        name_list = [name.strip() for name in raw_names.split(',') if name.strip()]
-        if not name_list:
-            return "No valid employee names provided.", 400
-
-        placeholders = ','.join(['?'] * len(name_list))
-        query = f"SELECT * FROM employees WHERE name IN ({placeholders})"
-        cursor.execute(query, name_list)
-        rows = cursor.fetchall()
-
-    conn.close()
+    rows = session['export_data']
 
     if not rows:
         return "No matching employees found.", 404
