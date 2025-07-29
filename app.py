@@ -48,6 +48,7 @@ def index():
 
 @app.route('/get_employee', methods=['GET', 'POST'])
 def get_employee_detail():
+    result = None
     if request.method == 'POST':
         raw_input = request.form['name']
         search_terms = [term.strip() for term in raw_input.split(',') if term.strip()]
@@ -75,15 +76,28 @@ def get_employee_detail():
                     leave_ids = leave_array_csv.split(',')
                     last_leave_id = leave_ids[-1]
                     cursor.execute('''
-                        SELECT leave_reason
+                        SELECT leave_reason, to_date
                         FROM leave_requests
                         WHERE id = ?
                     ''', (last_leave_id,))
                     result = cursor.fetchone()
-                    if result:
-                        latest_reason = result[0]
+                    latest_reason = ''
+                to_date = ''
+                if result:
+                    reason, to_date_str = result
+                    to_date = to_date_str
+                    current_date = datetime.now().date()
+                    try:
+                        leave_end_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
+                        if current_date <= leave_end_date:
+                            latest_reason = reason  # Employee is currently on leave
+                        else:
+                            latest_reason = ''  # Leave has ended
+                    except ValueError:
+                        latest_reason = ''  # Invalid date format fallback
 
-                result_set[emp_id] = row + (latest_reason,)  # Add leave reason as a new column
+                result_set[emp_id] = row + (latest_reason,)
+                print(result_set[emp_id])  # Debugging output
 
         employees = list(result_set.values())
 
@@ -155,7 +169,7 @@ def submit():
     email = request.form['email']
     employee_id = request.form['employee_id']
     phone = request.form['phone']
-    address = request.form['address']
+    address = ''
 
     conn = sqlite3.connect('employee.db')
     cursor = conn.cursor()
