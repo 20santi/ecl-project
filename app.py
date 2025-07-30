@@ -14,6 +14,8 @@ app.secret_key = 'my-secret-key-12345'  # type: ignore # Required for session us
 def init_db():
     conn = sqlite3.connect('employee.db')
     cursor = conn.cursor()
+    # cursor.execute("DROP TABLE IF EXISTS leave_requests")
+    # cursor.execute("DROP TABLE IF EXISTS employees")
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS employees (
@@ -97,7 +99,6 @@ def get_employee_detail():
                         latest_reason = ''  # Invalid date format fallback
 
                 result_set[emp_id] = row + (latest_reason,)
-                print(result_set[emp_id])  # Debugging output
 
         employees = list(result_set.values())
 
@@ -213,9 +214,69 @@ def download_excel():
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
+@app.route('/leave_type', methods=['POST'])
+def leave_type_filter():
+    selected_reason = request.form['reason']
+
+    conn = sqlite3.connect('employee.db')
+    cursor = conn.cursor()
+
+    # Step 1: Get all leave requests with the selected leave_reason
+    cursor.execute('''
+        SELECT employee_id FROM leave_requests
+        WHERE leave_reason = ?
+    ''', (selected_reason,))
+    leave_rows = cursor.fetchall()
+
+    if not leave_rows:
+        conn.close()
+        return render_template('show_employee.html', employees=[], names=selected_reason, searched=True)
+
+    emp_ids = list(set([str(row[0]) for row in leave_rows]))  # Unique employee IDs
+
+    # Step 2: Get employee details for these IDs
+    placeholders = ','.join(['?'] * len(emp_ids))
+
+    cursor.execute(f'''
+        SELECT * FROM employees
+        WHERE id IN ({placeholders})
+    ''', emp_ids)
+    employees = cursor.fetchall()
+
+    # Step 3: For each employee, attach the latest leave_reason (if current)
+    enriched_employees = []
+    for emp in employees:
+        emp_id = emp[0]
+        cursor.execute('''
+            SELECT leave_reason, to_date
+            FROM leave_requests
+            WHERE employee_id = ?
+            ORDER BY id DESC LIMIT 1
+        ''', (emp_id,))
+        leave_info = cursor.fetchone()
+        latest_reason = ''
+        if leave_info:
+            reason, to_date_str = leave_info
+            try:
+                current_date = datetime.now().date()
+                leave_end_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
+                if current_date <= leave_end_date:
+                    latest_reason = reason
+            except ValueError:
+                pass
+        enriched_employees.append(emp + (latest_reason,))
+
+    session['export_data'] = enriched_employees
+    conn.close()
+
+    return render_template('show_employee.html', employees=enriched_employees, names=selected_reason, searched=True)
+
+
+
 @app.route('/leaveForm')
 def leave_form():
     return render_template('leave_form.html')
+
 
 @app.route('/all_employees', methods=['GET'])
 def all_employees():

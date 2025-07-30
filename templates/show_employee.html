@@ -124,6 +124,20 @@
         <input type="text" id="name" name="name" required>
         <input type="submit" value="Search">
       </form>
+      <div class="form-row">
+        <form action="/leave_type" method="POST">
+          <div class="form-group" style="flex: 1; margin-top: 20px;">
+            <label for="reason">Leave Reason:</label>
+            <select id="reason" name="reason" required onchange="this.form.submit()">
+              <option value="" disabled selected>Select Reason</option>
+              <option value="CL">CL</option>
+              <option value="SL">SL</option>
+              <option value="EL">EL</option>
+            </select>
+          </div>
+        </form>
+      </div>
+
       <form action="/all_employees" method="GET" style="margin-top: 20px;">
         <button type="submit">All Record</button>
       </form>
