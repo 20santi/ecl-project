@@ -114,13 +114,19 @@
 
       <div class="form-row">
         <div class="form-group" style="flex: 1;">
-          <label for="reason">Leave Reason:</label>
-          <select id="reason" name="reason" required>
-            <option value="" disabled selected>Select Reason</option>
+          <label for="leave_type">Leave Type:</label>
+          <select id="leave_type" name="leave_type" required>
+            <option value="" disabled selected>Select Type</option>
             <option value="CL">CL</option>
             <option value="SL">SL</option>
             <option value="EL">EL</option>
           </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="reason">Leave Reason:</label>
+          <input type="text" id="reason" name="reason">
         </div>
       </div>
 

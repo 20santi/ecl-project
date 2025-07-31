@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, redirect
 import sqlite3
 from flask import send_file
 import pandas as pd # type: ignore
+import re # type: ignore
 from datetime import datetime
 from flask import session # type: ignore
 
@@ -34,6 +35,7 @@ def init_db():
             from_date TEXT NOT NULL,
             to_date TEXT NOT NULL,
             number_of_days INTEGER NOT NULL,
+            leave_type TEXT NOT NULL,
             leave_reason TEXT NOT NULL,
             employee_id INTEGER NOT NULL,
             FOREIGN KEY (employee_id) REFERENCES employees(id)
@@ -74,11 +76,14 @@ def get_employee_detail():
                 emp_id = row[0]
                 leave_array_csv = row[6]  # leave_array
                 latest_reason = ''
+                date_from = ''
+                date_to = ''
+                leaveType = ''
                 if leave_array_csv:
                     leave_ids = leave_array_csv.split(',')
                     last_leave_id = leave_ids[-1]
                     cursor.execute('''
-                        SELECT leave_reason, to_date
+                        SELECT leave_reason,leave_type,from_date,to_date
                         FROM leave_requests
                         WHERE id = ?
                     ''', (last_leave_id,))
@@ -86,21 +91,25 @@ def get_employee_detail():
                     latest_reason = ''
                 to_date = ''
                 if result:
-                    reason, to_date_str = result
+                    reason,leave_type, from_date_str, to_date_str = result
                     to_date = to_date_str
                     current_date = datetime.now().date()
                     try:
                         leave_end_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
                         if current_date <= leave_end_date:
                             latest_reason = reason  # Employee is currently on leave
+                            date_from = from_date_str
+                            date_to = to_date_str
+                            leaveType = leave_type
                         else:
                             latest_reason = ''  # Leave has ended
                     except ValueError:
                         latest_reason = ''  # Invalid date format fallback
 
-                result_set[emp_id] = row + (latest_reason,)
+                result_set[emp_id] = row + (latest_reason,leaveType, date_from, date_to)
 
         employees = list(result_set.values())
+        print("Employees found:", employees)
 
         session['export_data'] = employees  # Updated export data includes leave_reason
 
@@ -117,6 +126,9 @@ def submit_leave():
     to_date = request.form['to_date']
     number_of_days = int(request.form['days'])
     reason = request.form['reason']
+    leave_type = request.form['leave_type']
+    print("leave type: ", leave_type)
+    print("leave reason: ", reason)
 
     conn = sqlite3.connect('employee.db')
     cursor = conn.cursor()
@@ -134,9 +146,9 @@ def submit_leave():
 
     # Step 2: Insert leave request into leave_requests table
     cursor.execute('''
-        INSERT INTO leave_requests (from_date, to_date, number_of_days, leave_reason, employee_id)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (from_date, to_date, number_of_days, reason, emp_id))
+        INSERT INTO leave_requests (from_date, to_date, number_of_days, leave_reason, leave_type, employee_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (from_date, to_date, number_of_days, reason, leave_type, emp_id))
     conn.commit()
 
     new_leave_id = cursor.lastrowid  # Get ID of newly created leave request
@@ -194,10 +206,11 @@ def download_excel():
         return "No matching employees found.", 404
 
     # Filter out only the required columns from each row
-    export_rows = [(row[0], row[1], row[2], row[3], row[4], row[7]) for row in rows]
+    print("Exporting rows:", rows)
+    export_rows = [(row[1], row[2], row[3], row[4], row[7], row[8], row[9], row[10]) for row in rows]
 
     # Define only the required column headers
-    columns = ['ID', 'Name', 'Email', 'Employee ID', 'Phone', 'Leave Reason']
+    columns = ['Name', 'Email', 'Employee ID', 'Phone', 'Leave Reason', 'Leave Type', 'From', 'To']
 
     df = pd.DataFrame(export_rows, columns=columns)
 
@@ -216,60 +229,68 @@ def download_excel():
 
 @app.route('/leave_type', methods=['POST'])
 def leave_type_filter():
-    selected_reason = request.form['reason']
+    selected_type = request.form['reason']
+    print("Selected leave type:", selected_type)
 
     conn = sqlite3.connect('employee.db')
     cursor = conn.cursor()
 
     # Step 1: Get all leave requests with the selected leave_reason
+        # Step 1: Find employees whose latest leave type matches selected_type
     cursor.execute('''
-        SELECT employee_id FROM leave_requests
-        WHERE leave_reason = ?
-    ''', (selected_reason,))
-    leave_rows = cursor.fetchall()
+        SELECT e.*, lr.leave_reason, lr.leave_type, lr.from_date, lr.to_date
+        FROM employees e
+        JOIN (
+            SELECT employee_id, MAX(id) as max_id
+            FROM leave_requests
+            GROUP BY employee_id
+        ) latest ON latest.employee_id = e.id
+        JOIN leave_requests lr ON lr.id = latest.max_id
+        WHERE lr.leave_type = ?
+    ''', (selected_type,))
 
-    if not leave_rows:
-        conn.close()
-        return render_template('show_employee.html', employees=[], names=selected_reason, searched=True)
-
-    emp_ids = list(set([str(row[0]) for row in leave_rows]))  # Unique employee IDs
-
-    # Step 2: Get employee details for these IDs
-    placeholders = ','.join(['?'] * len(emp_ids))
-
-    cursor.execute(f'''
-        SELECT * FROM employees
-        WHERE id IN ({placeholders})
-    ''', emp_ids)
     employees = cursor.fetchall()
+
+    enriched_employees = []
+    for emp in employees:
+        # emp contains: all fields from employees + 4 leave fields
+        enriched_employees.append(emp)
+
+    session['export_data'] = enriched_employees
 
     # Step 3: For each employee, attach the latest leave_reason (if current)
     enriched_employees = []
     for emp in employees:
         emp_id = emp[0]
         cursor.execute('''
-            SELECT leave_reason, to_date
+            SELECT leave_reason,leave_type,from_date, to_date
             FROM leave_requests
             WHERE employee_id = ?
             ORDER BY id DESC LIMIT 1
         ''', (emp_id,))
         leave_info = cursor.fetchone()
         latest_reason = ''
+        leaveType = ''
+        fromDate = ''
+        toDate = ''
         if leave_info:
-            reason, to_date_str = leave_info
+            reason,type, from_date_str, to_date_str = leave_info
             try:
                 current_date = datetime.now().date()
                 leave_end_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
                 if current_date <= leave_end_date:
                     latest_reason = reason
+                    leaveType = type
+                    fromDate = from_date_str
+                    toDate = to_date_str
             except ValueError:
                 pass
-        enriched_employees.append(emp + (latest_reason,))
+        enriched_employees.append(emp + (latest_reason, leaveType, fromDate, toDate))
 
     session['export_data'] = enriched_employees
     conn.close()
 
-    return render_template('show_employee.html', employees=enriched_employees, names=selected_reason, searched=True)
+    return render_template('show_employee.html', employees=enriched_employees, names=selected_type, searched=True)
 
 
 

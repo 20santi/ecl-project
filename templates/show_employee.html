@@ -148,21 +148,25 @@
     <h3>Results for: {{ names }}</h3>
     <table>
       <tr>
-        <th>ID</th>
         <th>Name</th>
         <th>Email</th>
         <th>Employee ID</th>
         <th>Phone</th>
         <th>Leave Reason</th>
+        <th>Leave Type</th>
+        <th>Form</th>
+        <th>To</th>
       </tr>
       {% for employee in employees %}
       <tr>
-        <td>{{ employee[0] }}</td>
         <td>{{ employee[1] }}</td>
         <td>{{ employee[2] }}</td>
         <td>{{ employee[3] }}</td>
         <td>{{ employee[4] }}</td>
         <td>{{ employee[7] }}</td>
+        <td>{{ employee[8] }}</td>
+        <td>{{ employee[9] }}</td>
+        <td>{{ employee[10] }}</td>
       </tr>
       {% endfor %}
     </table>
