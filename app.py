@@ -109,7 +109,6 @@ def get_employee_detail():
                 result_set[emp_id] = row + (latest_reason,leaveType, date_from, date_to)
 
         employees = list(result_set.values())
-        print("Employees found:", employees)
 
         session['export_data'] = employees  # Updated export data includes leave_reason
 
@@ -127,8 +126,6 @@ def submit_leave():
     number_of_days = int(request.form['days'])
     reason = request.form['reason']
     leave_type = request.form['leave_type']
-    print("leave type: ", leave_type)
-    print("leave reason: ", reason)
 
     conn = sqlite3.connect('employee.db')
     cursor = conn.cursor()
@@ -206,7 +203,6 @@ def download_excel():
         return "No matching employees found.", 404
 
     # Filter out only the required columns from each row
-    print("Exporting rows:", rows)
     export_rows = [(row[1], row[2], row[3], row[4], row[7], row[8], row[9], row[10]) for row in rows]
 
     # Define only the required column headers
@@ -230,7 +226,6 @@ def download_excel():
 @app.route('/leave_type', methods=['POST'])
 def leave_type_filter():
     selected_type = request.form['reason']
-    print("Selected leave type:", selected_type)
 
     conn = sqlite3.connect('employee.db')
     cursor = conn.cursor()
